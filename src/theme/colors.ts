@@ -22,4 +22,5 @@ export const colors = {
 };
 
 export type ColorScheme = keyof typeof colors;
+export type ThemePreference = ColorScheme | "system";
 export type ColorName = keyof typeof colors.light;

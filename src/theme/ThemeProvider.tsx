@@ -6,13 +6,19 @@ import React, {
   useCallback,
 } from "react";
 import type { ReactNode } from "react";
-import { getTheme, type Theme, type ColorScheme } from "./index";
+import {
+  getTheme,
+  type Theme,
+  type ColorScheme,
+  type ThemePreference,
+} from "./index";
 
 export interface ThemeContextType {
   theme: Theme;
   colorScheme: ColorScheme;
+  themePreference: ThemePreference;
   toggleTheme: () => void;
-  setColorScheme: (scheme: ColorScheme) => void;
+  setThemePreference: (preference: ThemePreference) => void;
 }
 
 export const ThemeContext = createContext<ThemeContextType | undefined>(
@@ -21,34 +27,96 @@ export const ThemeContext = createContext<ThemeContextType | undefined>(
 
 interface ThemeProviderProps {
   children: ReactNode;
-  defaultScheme?: ColorScheme;
+  defaultPreference?: ThemePreference;
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   children,
-  defaultScheme = "light",
+  defaultPreference = "system",
 }) => {
-  const [colorScheme, setColorScheme] = useState<ColorScheme>(() => {
-    // Vérifier le localStorage pour persister le thème
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("color-scheme") as ColorScheme;
-      return saved || defaultScheme;
+  // Fonction pour détecter les préférences système
+  const getSystemPreference = (): ColorScheme => {
+    if (typeof window === "undefined") return "light";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  };
+
+  // État pour la préférence de l'utilisateur (system, light, dark)
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(
+    () => {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem(
+          "theme-preference"
+        ) as ThemePreference;
+        return saved || defaultPreference;
+      }
+      return defaultPreference;
     }
-    return defaultScheme;
+  );
+
+  // État pour le schéma de couleurs actuel (light ou dark uniquement)
+  const [colorScheme, setColorScheme] = useState<ColorScheme>(() => {
+    if (themePreference === "system") {
+      return getSystemPreference();
+    }
+    return themePreference;
   });
 
   const theme = getTheme(colorScheme);
 
+  // Fonction pour basculer entre les modes
   const toggleTheme = useCallback(() => {
-    setColorScheme((prev) => (prev === "light" ? "dark" : "light"));
-  }, []);
+    if (themePreference === "system") {
+      // Si on est en mode système, basculer vers le mode opposé au système
+      const systemPref = getSystemPreference();
+      const newPref = systemPref === "light" ? "dark" : "light";
+      setThemePreferenceState(newPref);
+      setColorScheme(newPref);
+    } else {
+      // Sinon, basculer entre light et dark
+      const newPref = themePreference === "light" ? "dark" : "light";
+      setThemePreferenceState(newPref);
+      setColorScheme(newPref);
+    }
+  }, [themePreference]);
 
-  // Persister le thème dans localStorage
+  // Effet pour persister la préférence
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("color-scheme", colorScheme);
+      localStorage.setItem("theme-preference", themePreference);
     }
-  }, [colorScheme]);
+  }, [themePreference]);
+
+  // Effet pour écouter les changements des préférences système
+  useEffect(() => {
+    if (themePreference !== "system") return;
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = (e: MediaQueryListEvent) => {
+      setColorScheme(e.matches ? "dark" : "light");
+    };
+
+    // Mise à jour initiale
+    setColorScheme(mediaQuery.matches ? "dark" : "light");
+
+    // Écouter les changements
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, [themePreference]);
+
+  // Fonction pour définir une préférence spécifique
+  const setThemePreference = useCallback((preference: ThemePreference) => {
+    setThemePreferenceState(preference);
+    if (preference === "system") {
+      setColorScheme(getSystemPreference());
+    } else {
+      setColorScheme(preference);
+    }
+  }, []);
 
   // Appliquer les variables CSS globales
   useEffect(() => {
@@ -80,10 +148,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     () => ({
       theme,
       colorScheme,
+      themePreference,
       toggleTheme,
-      setColorScheme,
+      setThemePreference,
     }),
-    [theme, colorScheme, toggleTheme, setColorScheme]
+    [theme, colorScheme, themePreference, toggleTheme, setThemePreference]
   );
 
   return (

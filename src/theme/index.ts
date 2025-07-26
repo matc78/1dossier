@@ -1,5 +1,5 @@
 import { colors } from "./colors";
-import type { ColorScheme } from "./colors";
+import type { ColorScheme, ThemePreference } from "./colors";
 import { typography } from "./typography";
 
 export interface Theme {
@@ -17,7 +17,7 @@ export const getTheme = (scheme: ColorScheme): Theme => ({
 // Export individual modules
 export { colors } from "./colors";
 export { typography } from "./typography";
-export type { ColorScheme, ColorName } from "./colors";
+export type { ColorScheme, ThemePreference, ColorName } from "./colors";
 export type { FontFamily, FontSize } from "./typography";
 
 // Export theme components
